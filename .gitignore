@@ -4,3 +4,9 @@ __pycache__/
 *.pyc
 *.parquet
 *.duckdb
+data/raw/
+data/intermediate/
+data/final/
+*.parquet
+*.csv
+*.duckdb.wal
