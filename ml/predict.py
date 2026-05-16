@@ -1,7 +1,4 @@
-import pandas as pd, duckdb, joblib, os
-from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, classification_report
+import pandas as pd, joblib, duckdb, os
 
 FEATURES = [
     'pickup_hour','pickup_dayofweek','is_weekend','pickup_month',
@@ -12,10 +9,11 @@ FEATURES = [
     'borough_avg_fare','borough_avg_distance','loc_pop_decile'
 ]
 
-def train_model():
+def predict():
+    model = joblib.load('ml/surge_model.pkl')
     con = duckdb.connect('data/warehouse.duckdb', read_only=True)
     df = con.execute('''
-        SELECT d.pickup_hour, d.pickup_dayofweek, d.is_weekend, d.pickup_month,
+        SELECT DISTINCT d.pickup_hour, d.pickup_dayofweek, d.is_weekend, d.pickup_month,
                f.has_event_nearby,
                COALESCE(ec.event_count, 0) AS event_count,
                COALESCE(ec.parade_count, 0) AS parade_count,
@@ -23,8 +21,7 @@ def train_model():
                COALESCE(ec.race_count, 0) AS race_count,
                CAST(AVG(f.fare_amount) OVER (PARTITION BY l.borough) AS FLOAT) AS borough_avg_fare,
                CAST(AVG(f.trip_distance) OVER (PARTITION BY l.borough) AS FLOAT) AS borough_avg_distance,
-               COUNT(*) OVER (PARTITION BY f.pickup_loc_id) AS loc_total,
-               COUNT(*) OVER (PARTITION BY f.pickup_loc_id, d.pickup_hour) AS trip_count
+               COUNT(*) OVER (PARTITION BY f.pickup_loc_id) AS loc_total
         FROM fact_trips f
         JOIN dim_datetime d ON f.datetime_id = d.datetime_id
         LEFT JOIN dim_location l ON f.pickup_loc_id = l.location_id
@@ -40,36 +37,19 @@ def train_model():
     ''').df()
     con.close()
 
-    threshold = df['trip_count'].quantile(0.75)
-    df['is_surge'] = (df['trip_count'] >= threshold).astype(int)
-
     df['loc_pop_decile'] = pd.qcut(df['loc_total'], q=10, labels=False, duplicates='drop')
     df['rush_hour'] = df['pickup_hour'].isin([7,8,9,16,17,18]).astype(int)
     df['hour_x_weekend'] = df['pickup_hour'] * df['is_weekend']
     df['hour_x_event'] = df['pickup_hour'] * df['has_event_nearby']
     df['weekend_x_event'] = df['is_weekend'] * df['has_event_nearby']
 
-    df = df.sample(frac=0.2, random_state=42)
-
     X = df[FEATURES].fillna(0)
-    y = df['is_surge']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-
-    model = HistGradientBoostingClassifier(
-        max_iter=100, max_depth=8, learning_rate=0.1,
-        random_state=42, class_weight='balanced'
-    )
-    model.fit(X_train, y_train)
-
-    y_pred = model.predict(X_test)
-    acc = accuracy_score(y_test, y_pred)
-    print(f'[OK] Akurasi model: {acc:.2%}')
-    print(classification_report(y_test, y_pred))
-
-    os.makedirs('ml', exist_ok=True)
-    joblib.dump(model, 'ml/surge_model.pkl')
-    print('[OK] Model disimpan ke ml/surge_model.pkl')
-    return model
+    df['is_surge'] = model.predict(X)
+    df['surge_probability'] = model.predict_proba(X)[:, 1]
+    os.makedirs('data/final', exist_ok=True)
+    df.to_parquet('data/final/ml_predictions.parquet', index=False)
+    print('[OK] Prediksi disimpan ke data/final/ml_predictions.parquet')
+    return df
 
 if __name__ == '__main__':
-    train_model()
+    predict()

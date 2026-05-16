@@ -13,7 +13,7 @@ def build_star_schema(clean_taxi_path='data/intermediate/clean_taxi.parquet',
     dt_df.to_parquet('data/intermediate/dim_datetime.parquet', index=False)
 
     # ── dim_location (dari taxi zone lookup) ──
-    loc_url = 'https://d37ci6vzurychx.cloudfront.net/misc/taxi+_zone_lookup.csv'
+    loc_url = 'https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv'
     try:
         loc_df = pd.read_csv(loc_url)
     except:
@@ -29,8 +29,22 @@ def build_star_schema(clean_taxi_path='data/intermediate/clean_taxi.parquet',
 
     # ── Gabungkan taxi dengan datetime & event ──
     taxi = taxi.merge(dt_df[['pickup_dt','datetime_id']], on='pickup_dt', how='left')
-    event_dates = set(events['event_date'].astype(str))
-    taxi['has_event_nearby'] = taxi['pickup_date'].astype(str).isin(event_dates).astype(int)
+
+    # Event nearby: cocokkan berdasarkan borough + tanggal
+    ev = events.copy()
+    ev['event_borough'] = ev.get('event_borough', '').fillna('').astype(str).str.strip().str.title()
+    ev['event_date'] = pd.to_datetime(ev['event_date'], errors='coerce').dt.date
+    ev = ev.dropna(subset=['event_date'])
+    ev = ev[ev['event_borough'] != '']
+    event_keys = set(ev['event_date'].astype(str) + '|' + ev['event_borough'])
+
+    # Ambil borough pickup location dari zone lookup
+    borough_map = loc_df[['location_id','borough']].drop_duplicates()
+    borough_map['borough'] = borough_map['borough'].str.strip().str.title()
+    taxi = taxi.merge(borough_map, left_on='PULocationID', right_on='location_id', how='left')
+    taxi['has_event_nearby'] = (
+        taxi['pickup_date'].astype(str) + '|' + taxi['borough']
+    ).isin(event_keys).astype(int)
     taxi['trip_id'] = range(1, len(taxi)+1)
 
     fact = taxi[['trip_id','datetime_id','PULocationID','DOLocationID',
