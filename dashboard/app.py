@@ -1,3 +1,11 @@
+# Anggota Kelompok
+# 235150200111035 Rafi Ananta Nugraha
+# 235150207111032 M. Naufal Al Farizki
+# 245150207111097 Joyce Christine Dolo Hutauruk
+# 245150200111041 Ezekiel Besarianta Prabaswara Sitorus 
+# 245150200111010 Ahmad Ibrahim
+
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px

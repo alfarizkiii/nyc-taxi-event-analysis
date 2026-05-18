@@ -1,3 +1,13 @@
+## Anggota Kelompok 
+
+| No | Nama | NIM |
+|----|------|-----|
+| 1 | Rafi Ananta Nugraha | 235150200111035 |
+| 2 | M. Naufal Al Farizki | 235150207111032 |
+| 3 | Joyce Christine Dolo Hutauruk | 245150207111097 |
+| 4 | Ezekiel Besarianta Prabaswara Sitorus | 245150200111041 |
+| 5 | Ahmad Ibrahim | 245150200111010 |
+
 # NYC Taxi Event Analysis
 
 Analisis dampak **event jalanan NYC** (parade, festival, konser, race, street event, block party) terhadap pola perjalanan **taksi kuning** serta prediksi **surge** (lonjakan permintaan) menggunakan machine learning. Periode data: Januari – Juni 2025.
