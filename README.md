@@ -367,7 +367,7 @@ Dashboard Streamlit interaktif dengan 3 tab:
 | Tab | Konten |
 |-----|--------|
 | **🗺️ Peta Surge** | Peta choropleth NYC dengan warna berdasarkan volume trip. Hover untuk detail zona. Filter sidebar untuk bulan, event, jam. |
-| **📊 Analisis Event** | 5 grafik: Trip per jam, Top 10 zona, Fare comparison, Duration comparison, Dampak per tipe event |
+| **📊 Analisis Event** | 7 grafik: Tren volume trip harian, Trip per jam, Heatmap kepadatan trip, Top 10 zona, Fare comparison, Tip comparison, Dampak per tipe event |
 | **🤖 ML Insights** | Prediksi surge: probabilitas per jam/hari, perbandingan event vs normal, ringkasan metrik |
 
 **Filter sidebar (global):**
