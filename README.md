@@ -277,7 +277,7 @@ Ini lebih akurat daripada versi awal yang hanya mencocokkan tanggal (citywide).
 
 ### 5.4 Analisis SQL
 
-Empat query analitis di `queries.py`:
+Tujuh query analitis di `queries.py`:
 
 | Query | Output | Insight |
 |-------|--------|---------|
@@ -285,6 +285,9 @@ Empat query analitis di `queries.py`:
 | Q2 | `top_zones_event.parquet` | 10 zona pickup paling ramai saat event, dengan avg fare |
 | Q3 | `fare_comparison.parquet` | Perbandingan rata-rata fare & durasi trip dengan/tanpa event |
 | Q4 | `event_type_impact.parquet` | Dampak per tipe event terhadap jumlah trip & tip |
+| Q5 | `daily_trend.parquet` | Agregasi Time Series harian untuk melacak tren makro dan proporsi trip yang berafiliasi dengan event |
+| Q6 | `heatmap_data.parquet` | Pemetaan untuk menganalisis anomali kepadatan trip terpusat |
+| Q7 | `boxplot_sample.parquet` | Sampel data untuk memvisualisasikan sebaran statistik dari Fare & Tip |
 
 ### 5.5 Machine Learning
 
