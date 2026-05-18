@@ -47,15 +47,16 @@ def run_queries(db_path='data/warehouse.duckdb'):
     ''').df()
     q3.to_parquet('data/final/fare_comparison.parquet', index=False, engine='pyarrow')
 
-    print("Mengeksekusi Query 4: Dampak per tipe event (Fixed Logic)...")
-    # PERBAIKAN LOGIKA JOIN: fact -> datetime -> event (menggunakan tanggal)
+    print("Mengeksekusi Query 4: Dampak per tipe event...")
     q4 = con.execute('''
         SELECT e.event_type,
-               COUNT(f.trip_id) AS total_trips,
+               COUNT(DISTINCT f.trip_id) AS total_trips,
                ROUND(AVG(f.tip_amount), 2) AS avg_tip
         FROM fact_trips f
         JOIN dim_datetime d ON f.datetime_id = d.datetime_id
+        JOIN dim_location l ON f.pickup_loc_id = l.location_id
         JOIN dim_event e ON CAST(d.pickup_date AS VARCHAR) = CAST(e.event_date AS VARCHAR)
+                        AND l.borough = e.event_borough
         WHERE f.has_event_nearby = 1
         GROUP BY e.event_type
         ORDER BY total_trips DESC
