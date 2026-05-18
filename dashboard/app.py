@@ -51,8 +51,12 @@ top_zones = load_parquet('top_zones_event.parquet')
 fare_comp = load_parquet('fare_comparison.parquet')
 event_type = load_parquet('event_type_impact.parquet')
 ml_pred = load_parquet('ml_predictions.parquet')
+daily_trend = load_parquet('daily_trend.parquet')
+heatmap_data = load_parquet('heatmap_data.parquet')
+boxplot_sample = load_parquet('boxplot_sample.parquet')
 zones = load_zone_data()
 geo = get_geo_json()
+
 
 # ── Sidebar filters ──
 st.sidebar.header('Filter')
@@ -140,76 +144,117 @@ with tab1:
 # TAB 2: ANALISIS EVENT
 # ════════════════════════════════════════
 with tab2:
-    st.subheader('Dampak Event terhadap Taksi NYC')
+    st.subheader('Dampak Event terhadap Pola Perjalanan Taksi NYC')
+    st.markdown('*Analisis ini membandingkan volume, distribusi temporal, dan metrik finansial antara area dengan dan tanpa event jalanan.*')
+
+    # TREN HARIAN (TIME SERIES)
+    if not daily_trend.empty:
+        fig_trend = px.line(
+            daily_trend, x='pickup_date', y=['total_trips', 'event_trips'],
+            title='Tren Volume Trip Harian (Jan - Jun 2025)',
+            labels={'pickup_date': 'Tanggal', 'value': 'Jumlah Trip', 'variable': 'Kategori'},
+            color_discrete_map={'total_trips': '#1f77b4', 'event_trips': '#ff7f0e'},
+            template='plotly_white'
+        )
+        fig_trend.update_layout(hovermode='x unified', legend_title_text='')
+        st.plotly_chart(fig_trend, use_container_width=True)
 
     col_a, col_b = st.columns(2)
 
     with col_a:
+        # 2. TRIP PER JAM (BAR)
         if not trips_hour.empty:
-            fig = px.bar(
+            fig_hour = px.bar(
                 trips_hour, x='hour',
                 y=['trips_normal', 'trips_event'],
-                title='Trip per Jam: Event vs Normal',
-                labels={'value': 'Jumlah Trip', 'hour': 'Jam'},
+                title='Distribusi Trip per Jam: Event vs Normal',
+                labels={'value': 'Jumlah Trip', 'hour': 'Jam dalam Sehari'},
                 barmode='group',
-                color_discrete_map={'trips_normal': '#1f77b4', 'trips_event': '#ff7f0e'}
+                color_discrete_map={'trips_normal': '#1f77b4', 'trips_event': '#ff7f0e'},
+                template='plotly_white'
             )
-            fig.update_layout(legend_title_text='')
-            st.plotly_chart(fig, use_container_width=True)
+            fig_hour.update_layout(legend_title_text='', xaxis=dict(dtick=2))
+            st.plotly_chart(fig_hour, use_container_width=True)
 
     with col_b:
-        if not top_zones.empty:
-            fig = px.bar(
-                top_zones.head(10),
-                x='total_trips', y='zone',
-                color='borough',
-                title='Top 10 Zona Pickup Saat Event',
-                labels={'total_trips': 'Jumlah Trip', 'zone': 'Zona'},
-                orientation='h'
-            )
-            fig.update_layout(yaxis={'categoryorder': 'total ascending'})
-            st.plotly_chart(fig, use_container_width=True)
+        # 3. HEATMAP HARI VS JAM
+        if not heatmap_data.empty:
+            day_map = {0:'Sen', 1:'Sel', 2:'Rab', 3:'Kam', 4:'Jum', 5:'Sab', 6:'Min'}
+            heatmap_data['day_label'] = heatmap_data['pickup_dayofweek'].map(day_map)
+            
+            # Memastikan urutan hari benar
+            heatmap_pivot = heatmap_data.pivot(index='day_label', columns='pickup_hour', values='total_trips')
+            heatmap_pivot = heatmap_pivot.reindex(['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'])
 
+            fig_heat = px.imshow(
+                heatmap_pivot,
+                title='Heatmap Kepadatan Trip (Hari vs Jam)',
+                labels=dict(x="Jam", y="Hari", color="Total Trip"),
+                color_continuous_scale='YlOrRd',
+                aspect='auto',
+                template='plotly_white'
+            )
+            st.plotly_chart(fig_heat, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("Distribusi Finansial (Fare & Tip)")
+    
     col_c, col_d = st.columns(2)
 
     with col_c:
-        if not fare_comp.empty:
-            fare_comp['label'] = fare_comp['has_event_nearby'].map({0: 'Tanpa Event', 1: 'Dengan Event'})
-            fig = go.Figure()
-            fig.add_trace(go.Bar(
-                name='Avg Fare',
-                x=fare_comp['label'], y=fare_comp['avg_fare'],
-                marker_color=['#1f77b4', '#ff7f0e'],
-                text=fare_comp['avg_fare'].apply(lambda x: f'${x:.2f}')
-            ))
-            fig.update_layout(title='Rata-rata Fare', yaxis_title='Fare ($)')
-            st.plotly_chart(fig, use_container_width=True)
+        # 4. BOXPLOT FARE AMOUNT 
+        if not boxplot_sample.empty:
+            boxplot_sample['Konteks'] = boxplot_sample['has_event_nearby'].map({0: 'Normal', 1: 'Saat Event'})
+            fig_box_fare = px.box(
+                boxplot_sample, x='Konteks', y='fare_amount', color='Konteks',
+                title='Distribusi Tarif (Fare Amount)',
+                labels={'fare_amount': 'Tarif (USD)'},
+                color_discrete_map={'Normal': '#1f77b4', 'Saat Event': '#ff7f0e'},
+                template='plotly_white'
+            )
+            fig_box_fare.update_yaxes(range=[0, boxplot_sample['fare_amount'].quantile(0.95) * 1.5])
+            st.plotly_chart(fig_box_fare, use_container_width=True)
 
     with col_d:
-        if not fare_comp.empty:
-            fig = go.Figure()
-            fig.add_trace(go.Bar(
-                name='Avg Duration',
-                x=fare_comp['label'], y=fare_comp['avg_duration'],
-                marker_color=['#1f77b4', '#ff7f0e'],
-                text=fare_comp['avg_duration'].apply(lambda x: f'{x:.1f} min')
-            ))
-            fig.update_layout(title='Rata-rata Durasi Trip', yaxis_title='Durasi (menit)')
-            st.plotly_chart(fig, use_container_width=True)
+        # 5. BOXPLOT TIP AMOUNT 
+        if not boxplot_sample.empty:
+            fig_box_tip = px.box(
+                boxplot_sample, x='Konteks', y='tip_amount', color='Konteks',
+                title='Distribusi Tip dari Penumpang',
+                labels={'tip_amount': 'Tip (USD)'},
+                color_discrete_map={'Normal': '#1f77b4', 'Saat Event': '#ff7f0e'},
+                template='plotly_white'
+            )
+            fig_box_tip.update_yaxes(range=[0, boxplot_sample['tip_amount'].quantile(0.95) * 2])
+            st.plotly_chart(fig_box_tip, use_container_width=True)
 
-    if not event_type.empty:
-        st.subheader('Dampak per Tipe Event')
-        fig = px.bar(
-            event_type, x='event_type', y='total_trips',
-            color='avg_tip',
-            title='Total Trip per Tipe Event (warna = rata-rata tip)',
-            labels={'event_type': 'Tipe Event', 'total_trips': 'Jumlah Trip', 'avg_tip': 'Rata-rata Tip ($)'},
-            color_continuous_scale='Blues'
-        )
-        st.plotly_chart(fig, use_container_width=True)
+    # 6. TOP ZONA & EVENT TYPE IMPACT 
+    col_e, col_f = st.columns(2)
+    
+    with col_e:
+        if not top_zones.empty:
+            fig_zones = px.bar(
+                top_zones.head(10).sort_values('total_trips', ascending=True),
+                x='total_trips', y='zone',
+                color='borough',
+                title='10 Zona Pickup Terpadat Saat Event',
+                labels={'total_trips': 'Volume Trip', 'zone': 'Zona Taksi'},
+                orientation='h',
+                template='plotly_white'
+            )
+            st.plotly_chart(fig_zones, use_container_width=True)
 
-        with st.expander('Detail Data Event'):
-            st.dataframe(event_type)
+    with col_f:
+        if not event_type.empty:
+            fig_evt = px.bar(
+                event_type, x='event_type', y='total_trips',
+                color='avg_tip',
+                title='Dampak per Tipe Event (Warna = Rata-rata Tip)',
+                labels={'event_type': 'Tipe Event', 'total_trips': 'Volume Trip', 'avg_tip': 'Avg Tip ($)'},
+                color_continuous_scale='Blues',
+                template='plotly_white'
+            )
+            st.plotly_chart(fig_evt, use_container_width=True)
 
 # ════════════════════════════════════════
 # TAB 3: ML INSIGHTS

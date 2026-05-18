@@ -63,10 +63,43 @@ def run_queries(db_path='data/warehouse.duckdb'):
     ''').df()
     q4.to_parquet('data/final/event_type_impact.parquet', index=False, engine='pyarrow')
 
+    print("Mengeksekusi Query 5: Tren Harian (Time Series)...")
+    q5 = con.execute('''
+        SELECT d.pickup_date,
+               COUNT(f.trip_id) AS total_trips,
+               SUM(f.has_event_nearby) AS event_trips
+        FROM fact_trips f
+        JOIN dim_datetime d ON f.datetime_id = d.datetime_id
+        GROUP BY d.pickup_date
+        ORDER BY d.pickup_date
+    ''').df()
+    q5.to_parquet('data/final/daily_trend.parquet', index=False, engine='pyarrow')
+
+    print("Mengeksekusi Query 6: Heatmap Jam vs Hari...")
+    q6 = con.execute('''
+        SELECT d.pickup_dayofweek, d.pickup_hour,
+               COUNT(f.trip_id) AS total_trips
+        FROM fact_trips f
+        JOIN dim_datetime d ON f.datetime_id = d.datetime_id
+        GROUP BY d.pickup_dayofweek, d.pickup_hour
+    ''').df()
+    q6.to_parquet('data/final/heatmap_data.parquet', index=False, engine='pyarrow')
+
+    print("Mengeksekusi Query 7: Sampel Boxplot Fare & Tip...")
+    q7 = con.execute('''
+        SELECT has_event_nearby, fare_amount, tip_amount
+        FROM fact_trips
+        USING SAMPLE 5%
+    ''').df()
+    q7.to_parquet('data/final/boxplot_sample.parquet', index=False, engine='pyarrow')
+
+    con.close()
+    print('[OK] Semua query selesai dan disimpan ke dalam folder data/final/')
+
     con.close()
     print('[OK] Semua query selesai dan disimpan ke dalam folder data/final/')
     
-    return q1, q2, q3, q4
+    return q1, q2, q3, q4, q5, q6, q7
 
 if __name__ == '__main__':
     run_queries()
